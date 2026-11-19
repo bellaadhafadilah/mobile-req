@@ -15,7 +15,7 @@ class _CekStatusPageState extends State<CekStatusPage> {
 
   String? searchedCode;
   TicketDetail? ticketDetail;
-  String ticketType = 'Permintaan';
+  String? ticketType;
   bool isSearching = false;
 
   Future<void> submitTracking() async {
@@ -23,17 +23,28 @@ class _CekStatusPageState extends State<CekStatusPage> {
       FocusScope.of(context).unfocus();
       setState(() {
         isSearching = true;
+        searchedCode = null;
+        ticketDetail = null;
+        ticketType = null;
       });
 
       try {
         final code = trackingController.text.trim();
-        final result = ticketType == 'Komplain'
-            ? await ApiService.instance.getKomplainStatus(code)
-            : await ApiService.instance.getPermintaanStatus(code);
+        late final TicketDetail result;
+        late final String detectedType;
+        try {
+          result = await ApiService.instance.getPermintaanStatus(code);
+          detectedType = 'Permintaan';
+        } on ApiException catch (e) {
+          if (e.statusCode != 404) rethrow;
+          result = await ApiService.instance.getKomplainStatus(code);
+          detectedType = 'Komplain';
+        }
         if (!mounted) return;
         setState(() {
           searchedCode = code;
           ticketDetail = result;
+          ticketType = detectedType;
           isSearching = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -117,8 +128,10 @@ class _CekStatusPageState extends State<CekStatusPage> {
                     children: [
                       // Header: Judul Cek Status Permintaan
                       Text(
-                        'Cek Status $ticketType',
-                        style: TextStyle(
+                        ticketType == null
+                            ? 'Cek Status Tiket'
+                            : 'Cek Status $ticketType',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1E293B),
@@ -126,36 +139,6 @@ class _CekStatusPageState extends State<CekStatusPage> {
                       ),
 
                       const SizedBox(height: 20),
-
-                      DropdownButtonFormField<String>(
-                        value: ticketType,
-                        decoration: const InputDecoration(
-                          labelText: 'Jenis Tiket',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Permintaan',
-                            child: Text('Permintaan'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Komplain',
-                            child: Text('Komplain'),
-                          ),
-                        ],
-                        onChanged: isSearching
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  ticketType = value;
-                                  ticketDetail = null;
-                                  searchedCode = null;
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 12),
 
                       // Input Field & Tombol Submit (Responsif Mobile)
                       LayoutBuilder(
@@ -329,7 +312,7 @@ class _CekStatusPageState extends State<CekStatusPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Status $ticketType',
+                      'Status ${ticketType ?? 'Tiket'}',
                       style: TextStyle(fontSize: 13, color: Colors.grey),
                     ),
                     const SizedBox(height: 2),

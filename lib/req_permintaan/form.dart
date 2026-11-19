@@ -108,6 +108,15 @@ class _RequestFormPageState extends State<RequestFormPage> {
     'Permintaan Data',
   ];
 
+  List<String> get _availablePermintaan {
+    final apiOptions = _apiPermintaan
+        ?.where((option) => option.trim().isNotEmpty)
+        .toList();
+    return apiOptions == null || apiOptions.isEmpty
+        ? daftarPermintaan
+        : apiOptions;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -428,27 +437,30 @@ class _RequestFormPageState extends State<RequestFormPage> {
 
               // JENIS PERMINTAAN
               buildLabel('Jenis Permintaan'),
-
-              ...(_apiPermintaan ?? daftarPermintaan).map((permintaan) {
-                return Card(
-                  elevation: 0,
-                  color: Colors.white,
-                  child: RadioListTile<String>(
-                    title: Text(
-                      permintaan,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    value: permintaan,
-                    groupValue: selectedPermintaan,
-                    activeColor: const Color(0xFF1976D2),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedPermintaan = value;
-                      });
-                    },
-                  ),
-                );
-              }),
+              DropdownButtonFormField<String>(
+                initialValue: selectedPermintaan,
+                isExpanded: true,
+                decoration: inputDecoration(
+                  'Pilih Jenis Permintaan',
+                  Icons.assignment_outlined,
+                ),
+                items: _availablePermintaan
+                    .map(
+                      (permintaan) => DropdownMenuItem<String>(
+                        value: permintaan,
+                        child: Text(
+                          permintaan,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedPermintaan = value;
+                  });
+                },
+              ),
 
               const SizedBox(height: 12),
 

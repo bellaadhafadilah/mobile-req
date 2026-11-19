@@ -21,9 +21,7 @@ class _DashboardReqPageState extends State<DashboardReqPage> {
   String? selectedRuangan;
   final List<Map<String, dynamic>> _apiStatuses = [];
   List<String>? _apiRuangans;
-  Map<String, dynamic> _dashboardSummary = {};
   bool _isLoadingTickets = true;
-  String? _dashboardError;
   String? _optionsError;
   String? _ticketError;
   Timer? _filterDebounce;
@@ -153,17 +151,6 @@ class _DashboardReqPageState extends State<DashboardReqPage> {
   }
 
   Future<void> _loadRemoteData() async {
-    try {
-      final dashboard = await ApiService.instance.getDashboard();
-      if (mounted) setState(() => _dashboardSummary = dashboard.raw);
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _dashboardError = e.message);
-    } catch (e) {
-      if (mounted) {
-        setState(() => _dashboardError = 'Gagal memuat ringkasan: $e');
-      }
-    }
-
     try {
       final options = await ApiService.instance.getOptions();
       if (mounted) {
@@ -600,23 +587,10 @@ class _DashboardReqPageState extends State<DashboardReqPage> {
               // Header Logo & Judul sesuai gambar
               buildHeaderLogo(),
 
-              if (_dashboardSummary.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                buildSummaryCard(),
-              ],
-
-              if ([
-                _dashboardError,
-                _optionsError,
-                _ticketError,
-              ].any((error) => error != null)) ...[
+              if (_optionsError != null || _ticketError != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  [
-                    _dashboardError,
-                    _optionsError,
-                    _ticketError,
-                  ].whereType<String>().join('\n'),
+                  [_optionsError, _ticketError].whereType<String>().join('\n'),
                   style: const TextStyle(color: Colors.red, fontSize: 12),
                 ),
               ],
@@ -684,85 +658,6 @@ class _DashboardReqPageState extends State<DashboardReqPage> {
             'Sistem Pelaporan dan Monitoring Komplain IT',
             style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildSummaryCard() {
-    final metrics = <MapEntry<String, String>>[];
-    void collect(String prefix, Object? value) {
-      if (value is Map) {
-        value.forEach((key, nestedValue) {
-          collect(
-            prefix.isEmpty ? key.toString() : '$prefix · $key',
-            nestedValue,
-          );
-        });
-      } else if (value is num || value is String || value is bool) {
-        metrics.add(MapEntry(prefix, value.toString()));
-      }
-    }
-
-    _dashboardSummary.forEach((key, value) => collect(key, value));
-    if (metrics.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Ringkasan Permintaan dan Komplain',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: metrics.take(8).map((metric) {
-              return SizedBox(
-                width: 145,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      metric.key,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                    Text(
-                      metric.value,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0090FF),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
           ),
         ],
       ),

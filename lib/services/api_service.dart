@@ -4,9 +4,9 @@
 //
 //  Cara ganti Base URL:
 //    Ubah nilai [baseUrl] di bawah sesuai target:
-//    - Android Emulator  : http://10.0.2.2:8010/api/v1
-//    - iOS Simulator     : http://127.0.0.1:8010/api/v1
-//    - Perangkat fisik   : http://<IP-LAN-KOMPUTER>:8010/api/v1
+//    - Android Emulator  : http://10.0.2.2:8000/api/v1
+//    - iOS Simulator     : http://127.0.0.1:8000/api/v1
+//    - Perangkat fisik   : http://<IP-LAN-KOMPUTER>:8000/api/v1
 //    - Production        : https://<HOST-PRODUCTION>/api/v1
 // ============================================================
 
@@ -115,8 +115,13 @@ class FormOptions {
   const FormOptions({required this.raw});
   final Map<String, dynamic> raw;
 
-  List<String> get units =>
-      (raw['units'] as List? ?? []).map((e) => e.toString()).toList();
+  List<String> get units => (raw['units'] as List? ?? [])
+      .map((unit) {
+        final name = unit is Map ? unit['name'] : unit;
+        return name?.toString().trim() ?? '';
+      })
+      .where((name) => name.isNotEmpty)
+      .toList();
 
   List<String> get tipes =>
       (raw['tipes'] as List? ?? []).map((e) => e.toString()).toList();

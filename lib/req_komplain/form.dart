@@ -1,5 +1,8 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../services/api_service.dart';
 
 class KomplainFormPage extends StatefulWidget {
@@ -14,13 +17,17 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
 
   final TextEditingController noTeleponController = TextEditingController();
   final TextEditingController extensionController = TextEditingController();
-  final TextEditingController judulKerusakanController = TextEditingController();
+  final TextEditingController unitKerjaController = TextEditingController();
+  final TextEditingController ruanganController = TextEditingController();
+  final TextEditingController namaPelaporController = TextEditingController();
+  final TextEditingController judulKerusakanController =
+      TextEditingController();
   final TextEditingController keteranganController = TextEditingController();
   final TextEditingController captchaController = TextEditingController();
 
   String selectedJenisPelapor = 'Internal';
   String? selectedKategori;
-  bool _isLoading = false;        // ← tambahan: state loading saat submit
+  bool _isLoading = false; // ← tambahan: state loading saat submit
   late String currentCaptcha;
 
   final List<Map<String, dynamic>> daftarKategori = [
@@ -64,6 +71,9 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
   void dispose() {
     noTeleponController.dispose();
     extensionController.dispose();
+    unitKerjaController.dispose();
+    ruanganController.dispose();
+    namaPelaporController.dispose();
     judulKerusakanController.dispose();
     keteranganController.dispose();
     captchaController.dispose();
@@ -104,8 +114,8 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
 
       if (selectedJenisPelapor == 'Internal') {
         result = await ApiService.instance.submitKomplainInternal(
-          unitKerjaInternal: extensionController.text.trim(), // extension dipakai sbg unit/lokasi internal
-          picInternal: noTeleponController.text.trim(),       // disesuaikan dengan field form yang ada
+          unitKerjaInternal: unitKerjaController.text.trim(),
+          picInternal: namaPelaporController.text.trim(),
           permintaan: selectedKategori!,
           noTelepon: noTeleponController.text.trim(),
           kerusakan: judulKerusakanController.text.trim(),
@@ -113,8 +123,8 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
         );
       } else {
         result = await ApiService.instance.submitKomplainEksternal(
-          lokasiExternal: extensionController.text.trim(),
-          picEksternal: noTeleponController.text.trim(),
+          lokasiExternal: ruanganController.text.trim(),
+          picEksternal: namaPelaporController.text.trim(),
           permintaan: selectedKategori!,
           noTelepon: noTeleponController.text.trim(),
           kerusakan: judulKerusakanController.text.trim(),
@@ -127,7 +137,9 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           title: const Row(
             children: [
               Icon(Icons.check_circle, color: Colors.green),
@@ -227,7 +239,10 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 20,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -255,6 +270,49 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                         ],
                       ),
 
+                      const SizedBox(height: 12),
+
+                      if (selectedJenisPelapor == 'Internal') ...[
+                        buildLabel('Unit Kerja'),
+                        TextFormField(
+                          controller: unitKerjaController,
+                          decoration: inputDecoration('Masukkan unit kerja'),
+                          validator: (value) {
+                            if (selectedJenisPelapor == 'Internal' &&
+                                (value == null || value.trim().isEmpty)) {
+                              return 'Unit kerja wajib diisi';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      buildLabel('Ruangan'),
+                      TextFormField(
+                        controller: ruanganController,
+                        decoration: inputDecoration('Masukkan nama ruangan'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Ruangan wajib diisi';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      buildLabel('Nama Pelapor'),
+                      TextFormField(
+                        controller: namaPelaporController,
+                        decoration: inputDecoration('Masukkan nama pelapor'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Nama pelapor wajib diisi';
+                          }
+                          return null;
+                        },
+                      ),
+
                       const SizedBox(height: 20),
 
                       // 2. Kategori Komplain
@@ -262,12 +320,13 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 2.3,
-                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: 2.3,
+                            ),
                         itemCount: daftarKategori.length,
                         itemBuilder: (context, index) {
                           final item = daftarKategori[index];
@@ -281,12 +340,19 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                             },
                             borderRadius: BorderRadius.circular(6),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFFF0F9FF) : Colors.white,
+                                color: isSelected
+                                    ? const Color(0xFFF0F9FF)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
-                                  color: isSelected ? const Color(0xFF0090FF) : const Color(0xFFE2E8F0),
+                                  color: isSelected
+                                      ? const Color(0xFF0090FF)
+                                      : const Color(0xFFE2E8F0),
                                   width: isSelected ? 1.5 : 1,
                                 ),
                               ),
@@ -296,7 +362,8 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                                     value: item['name'],
                                     groupValue: selectedKategori,
                                     activeColor: const Color(0xFF0090FF),
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                     onChanged: (val) {
                                       setState(() {
                                         selectedKategori = val;
@@ -314,7 +381,9 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                                       item['name'],
                                       style: TextStyle(
                                         fontSize: 12,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
                                         color: const Color(0xFF1E293B),
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -333,8 +402,13 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                       // 3. No Telepon
                       buildLabel('No Telepon'),
                       TextFormField(
+                        key: const ValueKey('complaint-phone'),
                         controller: noTeleponController,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(13),
+                        ],
                         decoration: inputDecoration('Masukkan no HP'),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -440,7 +514,9 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                              border: Border.all(
+                                color: const Color(0xFFCBD5E1),
+                              ),
                             ),
                             alignment: Alignment.center,
                             child: Row(
@@ -510,7 +586,9 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
                                     height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : const Text(
@@ -565,32 +643,39 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
 
   // Widget Radio Jenis Pelapor
   Widget buildRadioOption(String value) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Radio<String>(
-          value: value,
-          groupValue: selectedJenisPelapor,
-          activeColor: const Color(0xFF0090FF),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onChanged: (val) {
-            if (val != null) {
-              setState(() {
-                selectedJenisPelapor = val;
-              });
-            }
-          },
-        ),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Color(0xFF1E293B),
-            fontWeight: FontWeight.w500,
+    return InkWell(
+      onTap: () {
+        setState(() {
+          selectedJenisPelapor = value;
+        });
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Radio<String>(
+            value: value,
+            groupValue: selectedJenisPelapor,
+            activeColor: const Color(0xFF0090FF),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: (val) {
+              if (val != null) {
+                setState(() {
+                  selectedJenisPelapor = val;
+                });
+              }
+            },
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -624,14 +709,8 @@ class _KomplainFormPageState extends State<KomplainFormPage> {
   InputDecoration inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(
-        color: Color(0xFF94A3B8),
-        fontSize: 13,
-      ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 12,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       isDense: true,
       filled: true,
       fillColor: Colors.white,

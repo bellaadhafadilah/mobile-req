@@ -5,14 +5,14 @@ A new Flutter project.
 ## Backend API
 
 Aplikasi memakai endpoint `/api/v1` tanpa autentikasi. Android Emulator memakai
-default `http://10.0.2.2:8010/api/v1`. Untuk Android fisik, jalankan aplikasi
+`http://10.0.2.2:8000/api/v1`. Untuk Android fisik, jalankan aplikasi
 dengan alamat IPv4 komputer/server backend yang berada di jaringan yang sama:
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8010/api/v1
+flutter run --dart-define=API_BASE_URL=http://172.16.111.35:8000/api/v1
 ```
 
-Ganti `192.168.1.20` dan port dengan alamat server yang sebenarnya. Pastikan
+Ganti alamat tersebut jika IP komputer berubah. Pastikan
 backend menerima koneksi dari jaringan (bukan hanya `127.0.0.1`) dan firewall
 mengizinkan port tersebut. Untuk production, gunakan URL HTTPS.
 
