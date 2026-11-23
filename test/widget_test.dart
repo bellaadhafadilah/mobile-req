@@ -1,3 +1,4 @@
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:req_rsab/cek_status/form.dart';
@@ -5,9 +6,18 @@ import 'package:req_rsab/req_komplain/form.dart';
 import 'package:req_rsab/req_permintaan/form.dart';
 import 'package:req_rsab/dashboard_req/index.dart';
 import 'package:req_rsab/auth/login.dart';
+import 'package:req_rsab/screens/home_page.dart';
 import 'package:req_rsab/services/api_service.dart';
 
 void main() {
+  testWidgets('HomePage renders its service menu', (WidgetTester tester) async {
+    await tester.pumpWidget(const MaterialApp(home: HomePage()));
+
+    expect(find.text('Akses Layanan'), findsOneWidget);
+    expect(find.text('Request Permintaan Baru'), findsOneWidget);
+    expect(find.text('Cek Status Permintaan'), findsOneWidget);
+  });
+
   test('FormOptions extracts unit names from API objects', () {
     final options = FormOptions(
       raw: {

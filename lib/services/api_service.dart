@@ -100,6 +100,15 @@ class KomplainListResult {
 }
 
 // ------------------------------------------------------------------
+// MODEL — hasil paginasi daftar permintaan
+// ------------------------------------------------------------------
+class PermintaanListResult {
+  const PermintaanListResult({required this.items, required this.meta});
+  final List<Map<String, dynamic>> items;
+  final Map<String, dynamic> meta;
+}
+
+// ------------------------------------------------------------------
 // MODEL — detail tiket (permintaan atau komplain)
 // ------------------------------------------------------------------
 class TicketDetail {
@@ -379,6 +388,30 @@ class ApiService {
       history: (data['history'] as List? ?? [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(),
+    );
+  }
+
+  /// Ambil daftar permintaan dengan filter tanggal dan paginasi opsional.
+  Future<PermintaanListResult> getPermintaanList({
+    String? tanggalAwal,
+    String? tanggalAkhir,
+    int page = 1,
+    int perPage = 15,
+  }) async {
+    final query = <String, String>{
+      'page': page.toString(),
+      'per_page': perPage.toString(),
+    };
+    if (tanggalAwal != null) query['tanggal_awal'] = tanggalAwal;
+    if (tanggalAkhir != null) query['tanggal_akhir'] = tanggalAkhir;
+
+    final res = await _api.get('permintaan', query: query);
+    final rawList = (res['data'] as List? ?? []);
+    return PermintaanListResult(
+      items: rawList
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(),
+      meta: Map<String, dynamic>.from(res['meta'] as Map? ?? {}),
     );
   }
 
