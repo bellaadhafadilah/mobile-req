@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:req_rsab/admin/master/aplikasi_simrs.dart';
 import 'package:req_rsab/admin/sidebar.dart';
+import 'package:req_rsab/services/api_service.dart';
 
 void main() {
   testWidgets('Aplikasi SIMRS shows its columns on a narrow screen', (
@@ -13,7 +14,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const MaterialApp(home: AplikasiSimrsPage()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AplikasiSimrsPage(
+          loadApplications: () async =>
+              const AplikasiSimrsListResult(items: [], meta: {}),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Aplikasi SIMRS'), findsOneWidget);
@@ -41,9 +49,45 @@ void main() {
     await tester.tap(find.text('Tambah'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Fitur Tambah belum terhubung ke layanan SIMRS.'),
+      find.text('API mobile saat ini hanya mendukung membaca daftar aplikasi.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Aplikasi SIMRS renders records from its loader', (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AplikasiSimrsPage(
+          loadApplications: () async => const AplikasiSimrsListResult(
+            items: [
+              {
+                'id': 12,
+                'nama_aplikasi': 'SIMRS Pendaftaran',
+                'url': 'https://simrs.example.test',
+                'image_url': null,
+                'file_juknis_url': null,
+              },
+            ],
+            meta: {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('SIMRS Pendaftaran'),
+      240,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('SIMRS Pendaftaran'), findsOneWidget);
+    expect(find.text('https://simrs.example.test'), findsOneWidget);
+    expect(find.text('—'), findsNWidgets(3));
   });
 
   testWidgets('Aplikasi SIMRS opens from its sidebar item', (tester) async {
@@ -56,7 +100,10 @@ void main() {
       MaterialApp(
         home: Scaffold(
           appBar: AppBar(),
-          drawer: const AdminSidebar(),
+          drawer: AdminSidebar(
+            loadAplikasiSimrs: () async =>
+                const AplikasiSimrsListResult(items: [], meta: {}),
+          ),
           body: const SizedBox.expand(),
         ),
       ),

@@ -4,33 +4,95 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:req_rsab/admin/dashboard/dashboard_komplain.dart';
 import 'package:req_rsab/auth/login.dart';
 import 'package:req_rsab/screens/home_page.dart';
+import 'package:req_rsab/services/api_service.dart';
 
 Future<void> _submitLogin(
   WidgetTester tester, {
   required String username,
   required String password,
+  required bool isTechnician,
 }) async {
-  await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+  await tester.pumpWidget(
+    MaterialApp(home: LoginPage(loginAction: (_, _) async => isTechnician)),
+  );
   await tester.enterText(find.byType(TextFormField).at(0), username);
   await tester.enterText(find.byType(TextFormField).at(1), password);
   await tester.tap(find.text('Masuk ke Akun'));
-  await tester.pump(const Duration(milliseconds: 600));
-  await tester.pump(const Duration(milliseconds: 400));
+  await tester.pumpAndSettle();
 }
 
 void main() {
   testWidgets('admin credentials open admin dashboard', (tester) async {
-    await _submitLogin(tester, username: 'test', password: '123456789');
+    await _submitLogin(
+      tester,
+      username: 'admin-user',
+      password: 'password',
+      isTechnician: true,
+    );
 
     expect(find.byType(AdminDashboardPage), findsOneWidget);
+  });
+
+  testWidgets('debug test account opens admin without calling the API', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+    await tester.enterText(find.byType(TextFormField).at(0), 'test');
+    await tester.enterText(find.byType(TextFormField).at(1), '123456789');
+    await tester.tap(find.text('Masuk ke Akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AdminDashboardPage), findsOneWidget);
+  });
+
+  testWidgets('other debug credentials open HomePage without the API', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+    await tester.enterText(find.byType(TextFormField).at(0), 'other-user');
+    await tester.enterText(find.byType(TextFormField).at(1), 'password');
+    await tester.tap(find.text('Masuk ke Akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(HomePage), findsOneWidget);
   });
 
   testWidgets('other credentials continue to HomePage', (tester) async {
     await _submitLogin(
       tester,
-      username: 'unit lain',
-      password: 'password-lain',
+      username: 'regular-user',
+      password: 'password',
+      isTechnician: false,
     );
+
+    expect(find.byType(HomePage), findsOneWidget);
+  });
+
+  testWidgets('failed backend login stays on LoginPage', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginPage(
+          loginAction: (_, _) async =>
+              throw const ApiException(401, 'Username atau password salah.'),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextFormField).at(0), 'unknown');
+    await tester.enterText(find.byType(TextFormField).at(1), 'wrong');
+    await tester.tap(find.text('Masuk ke Akun'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Username atau password salah.'), findsOneWidget);
+    expect(find.byType(AdminDashboardPage), findsNothing);
+    expect(find.byType(HomePage), findsNothing);
+  });
+
+  testWidgets('users can continue without an internal account', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginPage()));
+    final continueButton = find.byKey(const ValueKey('continue-as-user'));
+    await tester.ensureVisible(continueButton);
+    await tester.tap(continueButton);
+    await tester.pumpAndSettle();
 
     expect(find.byType(HomePage), findsOneWidget);
   });

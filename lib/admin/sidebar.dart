@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 
 import '../auth/login.dart';
 import '../dashboard_req/index.dart';
+import '../services/api_service.dart';
 import 'dashboard/monitoring_serenic.dart';
 import 'dashboard/list_permintaan.dart';
 import 'master/aplikasi_simrs.dart';
 import 'master/user.dart';
 
 class AdminSidebar extends StatefulWidget {
-  const AdminSidebar({super.key});
+  const AdminSidebar({super.key, this.loadAplikasiSimrs});
+
+  final AplikasiSimrsLoader? loadAplikasiSimrs;
 
   @override
   State<AdminSidebar> createState() => _AdminSidebarState();
@@ -230,8 +233,9 @@ class _AdminSidebarState extends State<AdminSidebar> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      const AplikasiSimrsPage(),
+                                  builder: (context) => AplikasiSimrsPage(
+                                    loadApplications: widget.loadAplikasiSimrs,
+                                  ),
                                 ),
                               );
                             },
@@ -249,19 +253,118 @@ class _AdminSidebarState extends State<AdminSidebar> {
               icon: Icons.logout_rounded,
               title: 'Keluar',
               danger: true,
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              },
+              onTap: () => _confirmLogout(context),
             ),
             const SizedBox(height: 8),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEEEE),
+                  borderRadius: BorderRadius.circular(19),
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Color(0xFFD64A4A),
+                  size: 27,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Konfirmasi Keluar',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _navy,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Yakin ingin keluar dan kembali ke halaman login?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.blueGrey.shade600,
+                  fontSize: 13,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _navy,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFFDCE5EF)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Batal'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('confirm-logout'),
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFD64A4A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: const Icon(Icons.logout_rounded, size: 17),
+                      label: const Text('Keluar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (shouldLogout != true || !context.mounted) return;
+    try {
+      await ApiService.instance.logoutMobile();
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logout server gagal: ${error.message}')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Logout server gagal: $error')));
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
     );
   }
 

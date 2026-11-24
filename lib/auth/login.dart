@@ -1,10 +1,20 @@
+// ignore: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 import '../admin/dashboard/dashboard_komplain.dart';
 import '../screens/home_page.dart';
+import '../services/api_service.dart';
+
+typedef MobileLoginAction = Future<bool> Function(
+  String username,
+  String password,
+);
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.loginAction});
+
+  final MobileLoginAction? loginAction;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -27,7 +37,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -37,16 +47,25 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = true;
     });
 
-    // Simulasi proses autentikasi singkat
-    Future.delayed(const Duration(milliseconds: 600), () {
+    try {
+      final username = unitController.text.trim();
+      final password = passwordController.text;
+      final bool isTechnician;
+      if (widget.loginAction != null) {
+        isTechnician = await widget.loginAction!(username, password);
+      } else if (kDebugMode) {
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        isTechnician = username == 'test' && password == '123456789';
+      } else {
+        isTechnician = (await ApiService.instance.loginMobile(
+          username: username,
+          password: password,
+        )).isTechnician;
+      }
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Selamat datang, ${unitController.text.trim()}!'),
+          content: Text('Selamat datang, $username!'),
           backgroundColor: const Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
           margin: EdgeInsets.only(
@@ -58,18 +77,34 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
 
-      final isAdminLogin =
-          unitController.text.trim() == 'test' &&
-          passwordController.text == '123456789';
-
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) =>
-              isAdminLogin ? const AdminDashboardPage() : const HomePage(),
+              isTechnician ? const AdminDashboardPage() : const HomePage(),
         ),
       );
-    });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal login ke server: $error'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -82,7 +117,11 @@ class _LoginPageState extends State<LoginPage> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF071A3A), Color(0xFF0B3974), Color(0xFF1266A8)],
+                colors: [
+                  Color(0xFF071A3A),
+                  Color(0xFF0B3974),
+                  Color(0xFF1266A8),
+                ],
               ),
             ),
             child: SizedBox.expand(),
@@ -435,10 +474,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(width: 8),
                   const Text(
                     'Ingat Saya',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF52627A),
-                    ),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF52627A)),
                   ),
                 ],
               ),
@@ -523,6 +559,16 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           SizedBox(height: compact ? 10 : 18),
+          TextButton(
+            key: const ValueKey('continue-as-user'),
+            onPressed: _isLoading
+                ? null
+                : () => Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  ),
+            child: const Text('Lanjut sebagai pengguna'),
+          ),
+          SizedBox(height: compact ? 4 : 8),
           const Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment: WrapCrossAlignment.center,

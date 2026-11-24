@@ -25,6 +25,12 @@ class ApiConfig {
     defaultValue: 'http://172.16.111.35:8000/api/v1',
   );
 
+  /// URL API Laravel untuk route web/API di luar prefix /api/v1.
+  static const String laravelApiBaseUrl = String.fromEnvironment(
+    'LARAVEL_API_BASE_URL',
+    defaultValue: 'http://172.16.111.35:8000/api',
+  );
+
   /// Timeout per request
   static const Duration timeout = Duration(seconds: 15);
 }
@@ -64,6 +70,12 @@ class TicketResult {
   const TicketResult({required this.ticketNo, required this.message});
   final String ticketNo;
   final String message;
+}
+
+class MobileLoginResult {
+  const MobileLoginResult({required this.isTechnician});
+
+  final bool isTechnician;
 }
 
 // ------------------------------------------------------------------
@@ -109,6 +121,15 @@ class PermintaanListResult {
 }
 
 // ------------------------------------------------------------------
+// MODEL — daftar aplikasi SIMRS dari endpoint mobile Laravel
+// ------------------------------------------------------------------
+class AplikasiSimrsListResult {
+  const AplikasiSimrsListResult({required this.items, required this.meta});
+  final List<Map<String, dynamic>> items;
+  final Map<String, dynamic> meta;
+}
+
+// ------------------------------------------------------------------
 // MODEL — detail tiket (permintaan atau komplain)
 // ------------------------------------------------------------------
 class TicketDetail {
@@ -132,8 +153,11 @@ class FormOptions {
       .where((name) => name.isNotEmpty)
       .toList();
 
-  List<String> get tipes =>
-      (raw['tipes'] as List? ?? []).map((e) => e.toString()).toList();
+  List<String> get tipes {
+    final values = raw['permintaan_types'] ?? raw['tipes'];
+    if (values is! List) return [];
+    return values.map((value) => value.toString()).toList();
+  }
 
   List<String> get ruangans =>
       (raw['ruangans'] as List? ?? []).map((e) => e.toString()).toList();
@@ -147,14 +171,24 @@ class FormOptions {
 // INTERNAL HTTP CLIENT — tidak perlu diakses langsung dari UI
 // ------------------------------------------------------------------
 class _MobileApiClient {
-  _MobileApiClient()
-    : _baseUri = Uri.parse(
-        '${ApiConfig.baseUrl.replaceFirst(RegExp(r'/$'), '')}/',
-      ),
+  _MobileApiClient({String baseUrl = ApiConfig.baseUrl})
+    : _baseUri = Uri.parse('${baseUrl.replaceFirst(RegExp(r'/$'), '')}/'),
       _client = http.Client();
 
   final Uri _baseUri;
   final http.Client _client;
+  String? _accessToken;
+
+  bool get hasAuthToken => _accessToken != null;
+
+  Map<String, String> get headers => {
+    'Accept': 'application/json',
+    if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+  };
+
+  void setAuthToken(String token) => _accessToken = token;
+
+  void clearAuthToken() => _accessToken = null;
 
   Uri _endpoint(String path, {Map<String, String>? query}) =>
       _baseUri.resolve(path).replace(queryParameters: query);
@@ -164,12 +198,19 @@ class _MobileApiClient {
     Map<String, String>? query,
   }) async {
     final response = await _client
-        .get(
-          _endpoint(path, query: query),
-          headers: {'Accept': 'application/json'},
-        )
+        .get(_endpoint(path, query: query), headers: headers)
         .timeout(ApiConfig.timeout);
     return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> getJson(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final response = await _client
+        .get(_endpoint(path, query: query), headers: headers)
+        .timeout(ApiConfig.timeout);
+    return _decodeJsonBody(response);
   }
 
   Future<Map<String, dynamic>> postJson(
@@ -179,10 +220,7 @@ class _MobileApiClient {
     final response = await _client
         .post(
           _endpoint(path),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
+          headers: {...headers, 'Content-Type': 'application/json'},
           body: jsonEncode(payload),
         )
         .timeout(ApiConfig.timeout);
@@ -195,6 +233,19 @@ class _MobileApiClient {
   Uri endpoint(String path) => _endpoint(path);
 
   Map<String, dynamic> _decode(http.Response response) {
+    final decoded = _decodeJsonBody(response);
+    if (decoded['success'] != true) {
+      throw ApiException(
+        response.statusCode,
+        decoded['message']?.toString() ?? 'Request gagal.',
+        errors: decoded['errors'],
+      );
+    }
+
+    return decoded;
+  }
+
+  Map<String, dynamic> _decodeJsonBody(http.Response response) {
     final Object? decoded;
     try {
       decoded = jsonDecode(response.body);
@@ -212,9 +263,7 @@ class _MobileApiClient {
       );
     }
 
-    if (response.statusCode < 200 ||
-        response.statusCode >= 300 ||
-        decoded['success'] != true) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
         response.statusCode,
         decoded['message']?.toString() ?? 'Request gagal.',
@@ -234,6 +283,46 @@ class ApiService {
   static final ApiService instance = ApiService._();
 
   final _MobileApiClient _api = _MobileApiClient();
+  final _MobileApiClient _laravelApi = _MobileApiClient(
+    baseUrl: ApiConfig.laravelApiBaseUrl,
+  );
+
+  Future<MobileLoginResult> loginMobile({
+    required String username,
+    required String password,
+  }) async {
+    final response = await _api.postJson('auth/login', {
+      'username': username,
+      'password': password,
+      'device_name': 'mobile-req',
+    });
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException(200, 'Data login dari server tidak valid.');
+    }
+
+    final token = data['access_token'];
+    final user = data['user'];
+    if (token is! String || token.isEmpty || user is! Map) {
+      throw const ApiException(200, 'Data login dari server tidak lengkap.');
+    }
+
+    _api.setAuthToken(token);
+    final isTechnician =
+        user['is_teknisi'] == true ||
+        user['is_teknisi'] == 1 ||
+        user['is_teknisi'] == '1';
+    return MobileLoginResult(isTechnician: isTechnician);
+  }
+
+  Future<void> logoutMobile() async {
+    if (!_api.hasAuthToken) return;
+    try {
+      await _api.postJson('auth/logout', const <String, dynamic>{});
+    } finally {
+      _api.clearAuthToken();
+    }
+  }
 
   // ----------------------------------------------------------------
   // HEALTH — ping untuk cek koneksi ke backend
@@ -275,6 +364,37 @@ class ApiService {
       query: query.isEmpty ? null : query,
     );
     return DashboardData(raw: res['data'] as Map<String, dynamic>? ?? {});
+  }
+
+  /// Ambil daftar aplikasi yang memang ditampilkan pada katalog publik.
+  Future<AplikasiSimrsListResult> getAplikasiSimrsList({
+    String? search,
+    int page = 1,
+  }) async {
+    final query = <String, String>{'page': page.toString()};
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+
+    final response = await _laravelApi.getJson('mobile/aplikasi', query: query);
+    if (response['status'] != true) {
+      throw ApiException(
+        200,
+        response['message']?.toString() ?? 'Gagal memuat daftar aplikasi.',
+      );
+    }
+
+    final rawItems = response['data'];
+    if (rawItems is! List) {
+      throw const ApiException(200, 'Format daftar aplikasi tidak valid.');
+    }
+
+    return AplikasiSimrsListResult(
+      items: rawItems
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(),
+      meta: Map<String, dynamic>.from(response['meta'] as Map? ?? {}),
+    );
   }
 
   // ----------------------------------------------------------------
@@ -345,7 +465,7 @@ class ApiService {
     }
 
     final request = http.MultipartRequest('POST', _api.endpoint('permintaan'))
-      ..headers['Accept'] = 'application/json';
+      ..headers.addAll(_api.headers);
 
     request.fields['unit_kerja'] = unitKerja;
     request.fields['permintaan'] = permintaan;
